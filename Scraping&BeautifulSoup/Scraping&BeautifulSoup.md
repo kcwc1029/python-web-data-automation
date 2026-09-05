@@ -265,7 +265,7 @@ soup = BeautifulSoup(response.text, "html.parser")
   - [GPT：比較Headers設定](https://chatgpt.com/share/6a894619-907c-83e8-b738-a9468dad13ca)
 - [行政院本院新聞爬蟲：抓取新聞列表](./Scraping&BeautifulSoup_src/行政院本院新聞爬蟲：抓取新聞列表.py)
 - [行政院本院新聞爬蟲：進入詳細頁抓完整內文](./Scraping&BeautifulSoup_src/行政院本院新聞爬蟲：進入詳細頁抓完整內文.py)
-- [行政院本院新聞爬蟲：使用分頁抓多頁新聞](./Scraping&BeautifulSoup_src/行政院本院新聞爬蟲：使用分頁抓多頁新聞.md)
+- [行政院本院新聞爬蟲：使用分頁抓多頁新聞](./Scraping&BeautifulSoup_src/行政院本院新聞爬蟲：使用分頁抓多頁新聞.py)
 - [博客來爬蟲：以中文書暢銷榜為例](./Scraping&BeautifulSoup_src/博客來爬蟲：以中文書暢銷榜為例.py)
 
 ## 🔴爬蟲可以用的GPT提示詞

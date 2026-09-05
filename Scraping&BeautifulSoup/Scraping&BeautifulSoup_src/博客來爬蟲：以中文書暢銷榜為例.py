@@ -1,6 +1,3 @@
-"""在原本的「列表頁 → 詳細頁」外面，再加一層分頁迴圈"""
-import time
-
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -8,205 +5,114 @@ from urllib.parse import urljoin
 
 
 ### 設定網址
-base_url = "https://www.ey.gov.tw"
-list_url = "https://www.ey.gov.tw/Page/6485009ABEC1CB9C"
+url = "https://www.books.com.tw/web/sys_saletopb/books"
 
 headers = {
-    "User-Agent": "Mozilla/5.0"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/152.0.0.0 Safari/537.36",
+    "Referer": "https://www.books.com.tw/"
 }
 
 
-### 設定抓取範圍
-start_page = 1 # 從第幾頁開始
-end_page = 3 # 抓到第幾頁
-page_size = 15 # 每頁新聞數量
+### 發送 HTTP 請求
+response = requests.get(
+    url,
+    headers=headers,
+    timeout=10
+) # 向博客來排行榜頁面發送 GET 請求
+
+response.raise_for_status() # 如果發生 4xx 或 5xx，直接拋出例外
+
+print("狀態碼：", response.status_code)
 
 
-### 建立 Session
-session = requests.Session() # 多次請求時共用連線
-session.headers.update(headers)
+### 建立 BeautifulSoup
+soup = BeautifulSoup(
+    response.text,
+    "lxml"
+) # 將取得的 HTML 原始碼交給 BeautifulSoup 解析
 
 
-### 抓取新聞詳細頁內文
-def get_news_content(news_url):
-    try:
-        response = session.get(
-            news_url,
-            timeout=10
-        ) # 進入新聞詳細頁
+### 找出排行榜商品
+book_list = []
 
-        response.raise_for_status()
+items = soup.select("li.item") # 找出排行榜中的每一筆商品
 
-        soup = BeautifulSoup(
-            response.text,
-            "lxml"
+
+for item in items:
+
+    ### 抓取書名與網址
+    title_tag = item.select_one("h4 a")
+
+    if title_tag:
+        title = title_tag.get_text(" ", strip=True)
+
+        book_url = urljoin(
+            url,
+            title_tag.get("href", "")
         )
 
-        content_element = soup.select_one(
-            ".words_content .data_left"
-        ) # 找到新聞主要內文區域
-
-        if not content_element:
-            return ""
-
-        paragraphs = content_element.select("p") # 取得所有內文段落
-
-        content_list = []
-
-        for paragraph in paragraphs:
-            text = paragraph.get_text(
-                " ",
-                strip=True
-            ) # 取得段落文字並移除多餘空白
-
-            if text:
-                content_list.append(text)
-
-        content = "\n\n".join(content_list) # 每個段落之間空一行
-
-        return content
-
-    except requests.exceptions.RequestException as error:
-        print("詳細頁抓取失敗：", news_url)
-        print("錯誤訊息：", error)
-
-        return ""
+    else:
+        title = ""
+        book_url = ""
 
 
-### 儲存所有頁面的新聞
-news_list = []
+    ### 抓取作者
+    author_tag = item.select_one(".msg a")
 
-
-### 逐頁抓取新聞列表
-for page in range(start_page, end_page + 1):
-    print(f"\n正在抓取第 {page} 頁")
-
-    params = {
-        "page": page,
-        "PS": page_size
-    } # 設定分頁參數
-
-    try:
-        response = session.get(
-            list_url,
-            params=params,
-            timeout=10
-        ) # 取得指定頁面的新聞列表
-
-        response.raise_for_status()
-
-    except requests.exceptions.RequestException as error:
-        print(f"第 {page} 頁抓取失敗")
-        print("錯誤訊息：", error)
-
-        continue # 跳過失敗頁面，繼續抓下一頁
-
-    print("列表頁網址：", response.url)
-    print("狀態碼：", response.status_code)
-
-    soup = BeautifulSoup(
-        response.text,
-        "lxml"
-    )
-
-
-    ### 找到這一頁的所有新聞
-    news_items = soup.select(
-        "ul.list-group-item > li"
-    )
-
-    print("本頁新聞數量：", len(news_items))
-
-    if not news_items:
-        print("這一頁沒有新聞，停止抓取")
-        break
-
-
-    ### 逐則處理新聞
-    for item_index, item in enumerate(news_items, start=1):
-        title_element = item.select_one(".title")
-        date_element = item.select_one(".date")
-        summary_element = item.select_one("p")
-        link_element = item.select_one("a")
-
-        if not title_element or not date_element or not link_element:
-            continue
-
-        title = title_element.get_text(
+    if author_tag:
+        author = author_tag.get_text(
             " ",
             strip=True
         )
+    else:
+        author = ""
 
-        date = date_element.get_text(
+
+    ### 抓取價格
+    price_tag = item.select_one(".price")
+
+    if price_tag:
+        price = price_tag.get_text(
+            " ",
             strip=True
         )
+    else:
+        price = ""
 
-        if summary_element:
-            summary = summary_element.get_text(
-                " ",
-                strip=True
-            )
-        else:
-            summary = ""
 
-        relative_url = link_element.get("href")
+    ### 加入資料
+    if title:
 
-        news_url = urljoin(
-            base_url,
-            relative_url
-        ) # 將相對網址轉換成完整網址
-
-        print(
-            f"第 {page} 頁，第 {item_index} 則：{title}"
-        )
-
-        content = get_news_content(
-            news_url
-        ) # 進入詳細頁抓取完整內文
-
-        news_list.append({
-            "頁數": page,
-            "標題": title,
-            "日期": date,
-            "摘要": summary,
-            "完整內文": content,
-            "網址": news_url
+        book_list.append({
+            "排名": len(book_list) + 1,
+            "書名": title,
+            "作者": author,
+            "價格": price,
+            "網址": book_url
         })
 
-        time.sleep(1) # 每則新聞暫停 1 秒
+
+### 轉換成 DataFrame
+book_df = pd.DataFrame(book_list)
 
 
-    ### 每抓完一頁先儲存一次
-    news_df = pd.DataFrame(news_list)
+### 顯示結果
+print("\n博客來排行榜：")
 
-    news_df.to_csv(
-        "行政院多頁新聞.csv",
-        index=False,
-        encoding="utf-8-sig"
-    ) # 中途儲存，避免程式意外中斷後資料全部消失
-
-    print(f"第 {page} 頁完成，目前共抓到 {len(news_list)} 則新聞")
-
-    time.sleep(2) # 每抓完一頁暫停 2 秒
+print(book_df)
 
 
-### 顯示抓取結果
-news_df = pd.DataFrame(news_list)
-
-print("\n新聞資料：")
-print(news_df[["頁數", "標題", "日期", "網址"]])
-
-
-### 最終儲存
-news_df.to_csv(
-    "行政院多頁新聞.csv",
+### 儲存 CSV
+book_df.to_csv(
+    "博客來排行榜.csv",
     index=False,
     encoding="utf-8-sig"
-)
+) # utf-8-sig 可以避免 Excel 開啟中文時出現亂碼
 
 
 ### 執行完成
 print("\n資料抓取完成")
-print("抓取頁數：", start_page, "到", end_page)
-print("共抓到：", len(news_list), "則新聞")
-print("已產生：行政院多頁新聞.csv")
+print("共抓到：", len(book_df), "本書")
+print("已產生：博客來排行榜.csv")
